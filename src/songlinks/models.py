@@ -42,7 +42,7 @@ class Evidence(TypedDict):
 
     Attributes:
         records (list[int]): The two records joined, by `party_record_id`.
-        rule (str): `same_ipi_name_number`: both records carry the same society number. `model`: the model judged
+        rule (str): `same_ipi_name_number`: both records carry the same IPI name number. `model`: the model judged
             them to be the same person.
         probability (float | None, may be absent): The model's calibrated probability that the two records are one
             person, from 0 to 1.
@@ -54,7 +54,7 @@ class Evidence(TypedDict):
     """The two records joined, by `party_record_id`."""
 
     rule: str
-    """`same_ipi_name_number`: both records carry the same society number. `model`: the model judged them to be the
+    """`same_ipi_name_number`: both records carry the same IPI name number. `model`: the model judged them to be the
     same person.
     """
 
@@ -69,15 +69,14 @@ class Evidence(TypedDict):
 
 
 class LookupRecord(TypedDict):
-    """One registration record: a name as it was registered, with its society number if it has one.
+    """One registration record: a name as it was registered, with its IPI name number if it has one.
 
     Attributes:
         party_record_id (int): Identifies this record in the registration data.
         name (str): The name as registered.
         key_name (str | None, may be absent): The part of the name the record is filed under, usually the surname.
         names_before_key_name (str | None, may be absent): The rest of the name, usually given names.
-        ipi_name_number (str | None, may be absent): The society (IPI) name number, or None when the record has
-            none.
+        ipi_name_number (str | None, may be absent): The IPI name number, or None when the record has none.
         works (int): Works registered under this record.
         persistent_id (str | None, may be absent): The person ID this record belongs to, or None.
         prerelease (bool | None, may be absent): True: the ID may stop resolving, or later point at a different
@@ -97,7 +96,7 @@ class LookupRecord(TypedDict):
     """The rest of the name, usually given names."""
 
     ipi_name_number: NotRequired[str | None]
-    """The society (IPI) name number, or None when the record has none."""
+    """The IPI name number, or None when the record has none."""
 
     works: int
     """Works registered under this record."""
@@ -125,17 +124,17 @@ class Cluster(TypedDict):
         person_state (str | None, may be absent): The stored person's `state`; None when there is no ID.
         redirected_from (str | None, may be absent): When a record's ID has since been merged into this one, that
             older ID.
-        person_records (int | None, may be absent): How many member records the stored person holds; None when there
-            is no ID.
+        person_records (int | None, may be absent): How many registrations the stored person holds as theirs (its
+            member records); None when there is no ID.
         records_not_in_this_answer (int | None, may be absent): Member records the stored person holds that this
             lookup did not reach.
         names (list[str]): Every distinct registered name in `records`.
-        ipi_name_numbers (list[str]): Every distinct society number in `records`.
+        ipi_name_numbers (list[str]): Every distinct IPI name number in `records`.
         works (int): Distinct works across `records`: a work registered under two of them counts once, so this can
             be less than their sum.
         records (list[LookupRecord]): The registration records grouped into this person, most works first.
         evidence (list[Evidence]): One entry per pair of records joined.
-        main_ipi_name_number (str | None, may be absent): The society number most of this person's works are
+        main_ipi_name_number (str | None, may be absent): The IPI name number most of this person's works are
             registered under: the one whose records hold the most works.
         works_on_main_ipi (int | None, may be absent): Distinct works on the records carrying
             `main_ipi_name_number`.
@@ -164,7 +163,7 @@ class Cluster(TypedDict):
     """When a record's ID has since been merged into this one, that older ID."""
 
     person_records: NotRequired[int | None]
-    """How many member records the stored person holds; None when there is no ID."""
+    """How many registrations the stored person holds as theirs (its member records); None when there is no ID."""
 
     records_not_in_this_answer: NotRequired[int | None]
     """Member records the stored person holds that this lookup did not reach. Read the person to see them."""
@@ -173,11 +172,12 @@ class Cluster(TypedDict):
     """Every distinct registered name in `records`."""
 
     ipi_name_numbers: list[str]
-    """Every distinct society number in `records`."""
+    """Every distinct IPI name number in `records`."""
 
     works: int
     """Distinct works across `records`: a work registered under two of them counts once, so this can be less than
-    their sum.
+    their sum. It counts every record this lookup grouped, so it can be more than the stored person's own `works`,
+    which counts only the records the person ID holds.
     """
 
     records: list[LookupRecord]
@@ -187,7 +187,7 @@ class Cluster(TypedDict):
     """One entry per pair of records joined."""
 
     main_ipi_name_number: NotRequired[str | None]
-    """The society number most of this person's works are registered under: the one whose records hold the most
+    """The IPI name number most of this person's works are registered under: the one whose records hold the most
     works. None when no record has one.
     """
 
@@ -209,9 +209,9 @@ class Link(TypedDict):
     `works`.
 
     Attributes:
-        party_record_id (int): The linked record.
+        party_record_id (int): The linked record, by `party_record_id`.
         name (str): The linked record's registered name.
-        ipi_name_number (str | None, may be absent): The linked record's society number, or None.
+        ipi_name_number (str | None, may be absent): The linked record's IPI name number, or None.
         grade (str | None, may be absent): `checked`: the two people share no registered work, so the link is not a
             co-writer's. `co-writers too`: they share works, as bandmates do, and the link is weaker.
         steps (int): How close together the two records were registered; 1 is adjacent.
@@ -225,13 +225,13 @@ class Link(TypedDict):
     """
 
     party_record_id: int
-    """The linked record."""
+    """The linked record, by `party_record_id`."""
 
     name: str
     """The linked record's registered name."""
 
     ipi_name_number: NotRequired[str | None]
-    """The linked record's society number, or None."""
+    """The linked record's IPI name number, or None."""
 
     grade: NotRequired[str | None]
     """`checked`: the two people share no registered work, so the link is not a co-writer's. `co-writers too`: they
@@ -346,7 +346,7 @@ class Rejection(TypedDict):
         code (str): `single-token`: the name is one word, which is not searched. `no-match`: nothing matched closely
             enough. `publishers-only`: every match is registered only as a publisher or administrator, not as a writer.
         nearest (list[str], may be absent): Up to five registered names closest to the one asked for, as spelling
-            suggestions.
+            suggestions; often empty.
         set_aside_roles (list[str], may be absent): For `publishers-only`, the roles of the records set aside:
             `publisher`, `administrator`, or both.
     """
@@ -357,7 +357,7 @@ class Rejection(TypedDict):
     """
 
     nearest: NotRequired[list[str]]
-    """Up to five registered names closest to the one asked for, as spelling suggestions."""
+    """Up to five registered names closest to the one asked for, as spelling suggestions; often empty."""
 
     set_aside_roles: NotRequired[list[str]]
     """For `publishers-only`, the roles of the records set aside: `publisher`, `administrator`, or both."""
@@ -510,9 +510,10 @@ class LookupResponse(TypedDict):
 
     Attributes:
         query (Query): The question answered.
-        answer (str): `candidates`, or `rejected`, in which case `rejection` says why.
+        answer (str): Either `candidates` or `rejected`.
         rejection (Rejection | None, may be absent): Why the lookup stopped; None unless `answer` is `rejected`.
-        candidates (list[Cluster], may be absent): One entry per person.
+        candidates (list[Cluster], may be absent): The people the name could be, one entry each; empty when `answer`
+            is `rejected`.
         review (list[ReviewItem], may be absent): Pairs of records held apart; never part of a candidate.
         links (list[Link], may be absent): Records registered under another name next to this lookup's; filled only
             when `routes` includes `catalogue`.
@@ -534,13 +535,13 @@ class LookupResponse(TypedDict):
     """The question answered."""
 
     answer: str
-    """`candidates`, or `rejected`, in which case `rejection` says why."""
+    """Either `candidates` or `rejected`. When it is `rejected`, `rejection` says why."""
 
     rejection: NotRequired[Rejection | None]
     """Why the lookup stopped; None unless `answer` is `rejected`."""
 
     candidates: NotRequired[list[Cluster]]
-    """One entry per person."""
+    """The people the name could be, one entry each; empty when `answer` is `rejected`."""
 
     review: NotRequired[list[ReviewItem]]
     """Pairs of records held apart; never part of a candidate."""
@@ -569,7 +570,9 @@ class LookupResponse(TypedDict):
     """Which candidates wrote the song; None unless a `song` was sent and the lookup found candidates."""
 
     rate_limit: NotRequired[RateLimit | None]
-    """Your remaining allowance; None when no per-caller limit is in force."""
+    """Your remaining allowance; None when no per-caller limit is in force. The edge's per-address limit (about 100
+    requests per 5 minutes, 20 from VPNs and hosting networks) is separate and not counted here.
+    """
 
     provenance: Provenance
     """What produced this answer."""
@@ -617,32 +620,32 @@ class BuildRef(TypedDict):
     """A build: the automatic run that groups records into people and issues IDs.
 
     Attributes:
-        build_id (int): Identifies the build.
+        build_id (int): The build's number.
         status (str): The build's status, such as `applied`.
-        environment (str): Where it ran.
-        started_at (str | None, may be absent): ISO 8601.
-        finished_at (str | None, may be absent): ISO 8601.
+        environment (str): Where the build ran, such as `production`; diagnostic.
+        started_at (str | None, may be absent): When the build started, as an ISO 8601 timestamp.
+        finished_at (str | None, may be absent): When the build finished, as an ISO 8601 timestamp.
         model_version (str | None, may be absent): Identifies the model the build used.
         code_commit (str): Identifies the code the build ran.
-        code_dirty (bool): True if the build ran with uncommitted changes.
+        code_dirty (bool): True if the build ran with uncommitted changes; diagnostic.
         mlc_snapshot (str | None, may be absent): The date of the registration-data release the build read,
             YYYY-MM-DD.
     """
 
     build_id: int
-    """Identifies the build."""
+    """The build's number."""
 
     status: str
     """The build's status, such as `applied`."""
 
     environment: str
-    """Where it ran."""
+    """Where the build ran, such as `production`; diagnostic."""
 
     started_at: NotRequired[str | None]
-    """ISO 8601."""
+    """When the build started, as an ISO 8601 timestamp."""
 
     finished_at: NotRequired[str | None]
-    """ISO 8601."""
+    """When the build finished, as an ISO 8601 timestamp."""
 
     model_version: NotRequired[str | None]
     """Identifies the model the build used."""
@@ -651,7 +654,7 @@ class BuildRef(TypedDict):
     """Identifies the code the build ran."""
 
     code_dirty: bool
-    """True if the build ran with uncommitted changes."""
+    """True if the build ran with uncommitted changes; diagnostic."""
 
     mlc_snapshot: NotRequired[str | None]
     """The date of the registration-data release the build read, YYYY-MM-DD. None when that load is undated: never a
@@ -700,13 +703,13 @@ class PersonRecord(TypedDict):
             registration data.
         key_name (str | None, may be absent): The part of the name the record is filed under, usually the surname.
         names_before_key_name (str | None, may be absent): The rest of the name, usually given names.
-        ipi_name_number (str | None, may be absent): The society (IPI) name number, or None.
+        ipi_name_number (str | None, may be absent): The IPI name number, or None.
         works (int): This record's own works, counted once each.
         link (str): `anchor`: the record the ID was issued on. `asserted`: a member. `possible`: perhaps this
             person, but not a member.
-        rule (str): Why the record was linked: `same_ipi` (the same society number as a member), `ipi` (the anchor's
-            own society number), `model` (the model's judgement), `corroborated` (confirmed by an independent outside
-            source) or `verdict` (decided by a person).
+        rule (str): Why the record was linked: `same_ipi` (the same IPI name number as a member), `ipi` (the
+            anchor's own IPI name number), `model` (the model's judgement), `corroborated` (confirmed by an independent
+            outside source) or `verdict` (decided by a person).
         score (float | None, may be absent): The model's calibrated probability, where the model was involved.
         decided_by (str): `build` for an automatic build; otherwise who decided.
         build_id (int | None, may be absent): The build that linked the record.
@@ -729,7 +732,7 @@ class PersonRecord(TypedDict):
     """The rest of the name, usually given names."""
 
     ipi_name_number: NotRequired[str | None]
-    """The society (IPI) name number, or None."""
+    """The IPI name number, or None."""
 
     works: int
     """This record's own works, counted once each."""
@@ -740,7 +743,7 @@ class PersonRecord(TypedDict):
     """
 
     rule: str
-    """Why the record was linked: `same_ipi` (the same society number as a member), `ipi` (the anchor's own society
+    """Why the record was linked: `same_ipi` (the same IPI name number as a member), `ipi` (the anchor's own IPI name
     number), `model` (the model's judgement), `corroborated` (confirmed by an independent outside source) or
     `verdict` (decided by a person).
     """
@@ -767,7 +770,7 @@ class PersonRecord(TypedDict):
 
 
 class PersonWork(TypedDict):
-    """One work registered under a member record.
+    """One work registered under one or more of the person's member records (the registrations the ID holds).
 
     Attributes:
         mlc_work_id (str): Identifies the work in the registration data.
@@ -790,7 +793,7 @@ class PersonWork(TypedDict):
 
 
 class WorksPage(TypedDict):
-    """One page of the person's works, most-recorded first.
+    """One page of the person's works: most-recorded first when recording counts are available (see `ordered_by`).
 
     Attributes:
         total (int): All the person's works: distinct works across member records, a work under two of them counted
@@ -828,8 +831,9 @@ class WorksPage(TypedDict):
 
 
 class PersonResponse(TypedDict):
-    """A stored person: what the ID holds, not a fresh lookup. `records` are members. `possible` records are not
-    members, are never counted, and may belong to someone else.
+    """A stored person: what a person ID holds, not a fresh lookup. `records` are its members, the registrations the
+    ID holds as this person's. `possible` lists registrations that may also be theirs; they are not members, are
+    never counted in `works`, and may belong to someone else.
 
     Attributes:
         person_id (str): `SLP-XXXX-XXXX-C`; the last character is a check character.
@@ -837,8 +841,8 @@ class PersonResponse(TypedDict):
             do not store it.
         state (str): `active`. `split`: part of the group was separated and this ID kept the anchor.
             `anchor_missing`: the anchor record is no longer in the registration data; the ID stays.
-        evidence (str): What the ID qualifies on now: `same_ipi` (members share a society number), `ipi` (the
-            anchor's society number and catalogue), `corroborated` (a member's society number confirmed by an
+        evidence (str): What the ID qualifies on now: `same_ipi` (members share a IPI name number), `ipi` (the
+            anchor's IPI name number and catalogue), `corroborated` (a member's IPI name number confirmed by an
             independent outside source) or `human` (decided by a person).
         issued_evidence (str | None, may be absent): What the ID was issued on, one of the `evidence` values, from
             its history.
@@ -849,10 +853,10 @@ class PersonResponse(TypedDict):
         merged_from (list[str], may be absent): IDs merged into this one; each redirects here.
         name (str | None, may be absent): The name to show for this person.
         names (list[str]): Every distinct registered name among the members.
-        ipi_name_numbers (list[str]): Every distinct society number among the members.
+        ipi_name_numbers (list[str]): Every distinct IPI name number among the members.
         works (int): Distinct works across member records; `possible` records are not counted.
-        main_ipi_name_number (str | None, may be absent): This person's main society number: the one on the record
-            their ID was created around (`link` `anchor`), which never changes.
+        main_ipi_name_number (str | None, may be absent): This person's main IPI name number: the one on the record
+            their ID was created around (the record whose `link` is `anchor`).
         works_on_main_ipi (int | None, may be absent): Distinct works on the member records carrying
             `main_ipi_name_number`.
         records (list[PersonRecord]): The members: `link` is `anchor` or `asserted`.
@@ -878,9 +882,9 @@ class PersonResponse(TypedDict):
     """
 
     evidence: str
-    """What the ID qualifies on now: `same_ipi` (members share a society number), `ipi` (the anchor's society number
-    and catalogue), `corroborated` (a member's society number confirmed by an independent outside source) or
-    `human` (decided by a person). It can change after issue; `issued_evidence` is what it was issued on.
+    """What the ID qualifies on now: `same_ipi` (members share a IPI name number), `ipi` (the anchor's IPI name
+    number and catalogue), `corroborated` (a member's IPI name number confirmed by an independent outside source)
+    or `human` (decided by a person). It can change after issue; `issued_evidence` is what it was issued on.
     """
 
     issued_evidence: NotRequired[str | None]
@@ -907,16 +911,15 @@ class PersonResponse(TypedDict):
     """Every distinct registered name among the members."""
 
     ipi_name_numbers: list[str]
-    """Every distinct society number among the members."""
+    """Every distinct IPI name number among the members."""
 
     works: int
     """Distinct works across member records; `possible` records are not counted."""
 
     main_ipi_name_number: NotRequired[str | None]
-    """This person's main society number: the one on the record their ID was created around (`link` `anchor`), which
-    never changes. Usually the number most of their works are under; a record with another number may hold more
-    (since 2026-09-15 such a record joins only on a person's verdict; earlier IDs can hold ones the model joined,
-    `rule` `model`). None when no member has one.
+    """This person's main IPI name number: the one on the record their ID was created around (the record whose `link`
+    is `anchor`). It never changes. It is usually, but not always, the number most of their works are under. None
+    when no member has one.
     """
 
     works_on_main_ipi: NotRequired[int | None]
@@ -939,14 +942,16 @@ class PersonResponse(TypedDict):
     """Every change to this ID, oldest first."""
 
     rate_limit: NotRequired[RateLimit | None]
-    """Your remaining allowance; None when no per-caller limit is in force."""
+    """Your remaining allowance; None when no per-caller limit is in force. The edge's per-address limit (about 100
+    requests per 5 minutes, 20 from VPNs and hosting networks) is separate and not counted here.
+    """
 
     provenance: PersonProvenance
     """What grouped these records, and what served the response."""
 
 
 class PersonWithdrawnResponse(TypedDict):
-    """HTTP 410: this ID was issued and later withdrawn. The number will never be issued to anyone else.
+    """HTTP 410: this ID was issued and later withdrawn. This person ID will never be issued to anyone else.
 
     Attributes:
         person_id (str): The withdrawn ID.
@@ -985,10 +990,11 @@ class WriterAnswer(TypedDict):
             chosen. `none`: no person here holds it; it may belong to a publisher, or its records have not been grouped.
             `invalid`: not an IPI name number (up to 11 digits; spaces and dashes are ignored).
         person_id (str | None, may be absent): The person's ID, `SLP-XXXX-XXXX-C`; None unless `status` is `person`.
-        name (str | None, may be absent): The name to show for the person.
+        name (str | None, may be absent): The name to show for the person; None unless `status` is `person`.
         names (list[str], may be absent): Every distinct name the person's records are registered under, `name`
             first.
-        works (int | None, may be absent): Distinct works across the person's records.
+        works (int | None, may be absent): Distinct works across the person's records; None unless `status` is
+            `person`.
         main_ipi_name_number (str | None, may be absent): The person's main number: the one on the record their ID
             was created around.
         works_on_main_ipi (int | None, may be absent): Distinct works on the records carrying
@@ -1016,7 +1022,7 @@ class WriterAnswer(TypedDict):
     """The person's ID, `SLP-XXXX-XXXX-C`; None unless `status` is `person`."""
 
     name: NotRequired[str | None]
-    """The name to show for the person."""
+    """The name to show for the person; None unless `status` is `person`."""
 
     names: NotRequired[list[str]]
     """Every distinct name the person's records are registered under, `name` first. Compare a spelling you hold
@@ -1025,7 +1031,7 @@ class WriterAnswer(TypedDict):
     """
 
     works: NotRequired[int | None]
-    """Distinct works across the person's records."""
+    """Distinct works across the person's records; None unless `status` is `person`."""
 
     main_ipi_name_number: NotRequired[str | None]
     """The person's main number: the one on the record their ID was created around. It can differ from
@@ -1153,7 +1159,9 @@ class VersionResponse(TypedDict):
 
 
 class ApiError(TypedDict):
-    """The body of a 400, 404, 500 or 503 response. It never carries detail about what failed.
+    """The body of a 400, 404, 500 or 503 response. It never carries detail about what failed. A malformed parameter
+    (an empty name, a threshold out of range) is answered 422 instead, with a `detail` list saying which parameter
+    and why.
 
     Attributes:
         error (str): `too_many` or `no_numbers` (400), `not_found` (404), `internal` (500), or `not_ready` or `busy`
@@ -1178,7 +1186,7 @@ class RateLimited(TypedDict):
         message (str): A sentence you can show.
         limit (int): Requests allowed per window.
         window_seconds (int): The length of the window, in seconds.
-        retry_after_seconds (int): How long to wait; also sent as the `Retry-After` header.
+        retry_after_seconds (int): The most you need to wait, in seconds.
         lookups_used (int): Requests counted in the current window.
         contact (str, may be absent): Where to ask for more.
     """
@@ -1196,7 +1204,9 @@ class RateLimited(TypedDict):
     """The length of the window, in seconds."""
 
     retry_after_seconds: int
-    """How long to wait; also sent as the `Retry-After` header."""
+    """The most you need to wait, in seconds. The API's own limit also sends it as the `Retry-After` header; the
+    edge's per-address limit sends it only here.
+    """
 
     lookups_used: int
     """Requests counted in the current window."""
