@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import ssl
 import time
 import urllib.error
@@ -39,17 +40,25 @@ _MAX_WAIT_SECONDS = 60.0
 
 
 def normalize_ipi(ipi_name_number: str) -> str:
-    """Write an IPI name number the way the API's answers do: digits only, padded with leading zeros to 11.
+    """Write an IPI name number the way `Songlinks.writers` answers do, to match the answers to the numbers you sent.
 
-    Use it to match `Songlinks.writers` answers to the numbers you sent.
+    Spaces and dashes (including the typographic dashes a spreadsheet substitutes) are dropped, and a run of 1 to 11
+    digits is padded with leading zeros to 11: `338980326` and `003-389-803 26` both become `00338980326`. Anything
+    else is not an IPI name number, and is returned trimmed (to 32 characters), as the API echoes it with status
+    `invalid`. A dot is not a separator: `15036818.0` is what a spreadsheet makes of a number read as a float, and
+    dropping the dot would turn it into somebody else's number.
 
     Args:
         ipi_name_number: An IPI name number as you have it, such as `338980326` or `003-389-803-26`.
 
     Returns:
-        The number as 11 digits, such as `00338980326`.
+        The number as 11 digits, such as `00338980326`, or the trimmed input when it is not one.
     """
-    return "".join(c for c in ipi_name_number if c not in " -").zfill(11)
+    # The same reading as the API's own (writer/service.py ipi_key).
+    digits = re.sub(r"[\s\-\u2010-\u2015\u2212]", "", ipi_name_number)
+    if re.fullmatch(r"[0-9]{1,11}", digits):
+        return digits.zfill(11)
+    return ipi_name_number.strip()[:32]
 
 
 class Songlinks:
@@ -78,7 +87,8 @@ class Songlinks:
             base_url: The API's address. The default is https://songlinks.io.
             timeout: How long one request may take before it is abandoned, in seconds. The default is 30.
             max_retries: How many times a request is retried after a 429, a 503 or a network failure. The default
-                is 2; 0 turns retrying off.
+                is 2; 0 turns retrying off. An answer asking for a wait longer than a minute is not retried: it is
+                raised at once.
             user_agent: Your app's name and version, such as `my-app/1.2`, added to each request's User-Agent after
                 the SDK's own.
             ssl_context: The TLS settings to connect with, such as a context trusting a company proxy's certificate.

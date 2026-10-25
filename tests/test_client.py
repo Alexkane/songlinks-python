@@ -173,6 +173,19 @@ def test_the_edges_429_has_its_wait_only_in_the_body(server: Server) -> None:
     assert caught.value.retry_after_seconds == 300.0 and len(server.requests) == 1
 
 
+def test_a_503_asking_for_more_than_a_minute_is_raised_at_once(server: Server) -> None:
+    server.replies.append((503, {"Retry-After": "120"}, {"error": "busy", "message": "Busy."}))
+    with pytest.raises(SonglinksError) as caught:
+        client(server).version()
+    assert (caught.value.status, caught.value.code, len(server.requests)) == (503, "busy", 1)
+
+
+def test_the_header_wins_over_the_body(server: Server) -> None:
+    server.replies += [(429, {"Retry-After": "2"}, {"retry_after_seconds": 300}), (200, {}, {})]
+    client(server).version()
+    assert server.waits == [2.0]  # type: ignore[attr-defined]
+
+
 def test_a_short_wait_in_the_body_is_waited_out(server: Server) -> None:
     server.replies += [(429, {}, {"retry_after_seconds": 5}), (200, {}, {})]
     client(server).version()
@@ -200,6 +213,10 @@ def test_normalize_ipi_writes_a_number_the_way_the_answer_does() -> None:
 
     assert normalize_ipi("338980326") == "00338980326"
     assert normalize_ipi("003-389-803 26") == "00338980326"
+    assert normalize_ipi("\t003\u2013389803 26") == "00338980326"  # a tab and an en dash
+    assert normalize_ipi(" abc ") == "abc"  # invalid: echoed trimmed, as the API does
+    assert normalize_ipi("15036818.0") == "15036818.0"
+    assert normalize_ipi("123456789012") == "123456789012"
 
 
 def test_other_errors_are_not_retried(server: Server) -> None:

@@ -42,7 +42,8 @@ class Evidence(TypedDict):
 
     Attributes:
         records (list[int]): The two records joined, by `party_record_id`.
-        rule (str): `same_ipi_name_number`: both records carry the same society number.
+        rule (str): `same_ipi_name_number`: both records carry the same society number. `model`: the model judged
+            them to be the same person.
         probability (float | None, may be absent): The model's calibrated probability that the two records are one
             person, from 0 to 1.
         shared (dict[str, Any], may be absent): What the two records have in common, under `co_writers`,
@@ -212,7 +213,7 @@ class Link(TypedDict):
         name (str): The linked record's registered name.
         ipi_name_number (str | None, may be absent): The linked record's society number, or None.
         grade (str | None, may be absent): `checked`: the two people share no registered work, so the link is not a
-            co-writer's.
+            co-writer's. `co-writers too`: they share works, as bandmates do, and the link is weaker.
         steps (int): How close together the two records were registered; 1 is adjacent.
         works (int): Works registered under the linked record.
         from_record (int): The record in this lookup the link starts from.
@@ -264,8 +265,8 @@ class Provenance(TypedDict):
     Attributes:
         model_md5 (str): Identifies the model that grouped the records.
         code_commit (str): Identifies the code that produced the answer.
-        mlc_snapshot (str | None, may be absent): The date of the registration-data release this answer read, YYYY-
-            MM-DD.
+        mlc_snapshot (str | None, may be absent): The date of the registration-data release this answer read,
+            YYYY-MM-DD.
         threshold (float): The threshold this answer used; see the `threshold` parameter.
         review_threshold (float): The lowest probability at which an unjoined pair is listed in `review`.
         max_candidates (int): The most records one lookup groups; see `truncated`.
@@ -342,7 +343,8 @@ class Rejection(TypedDict):
     """Why a lookup stopped without candidates. It comes with HTTP 200: it is an answer, not an error.
 
     Attributes:
-        code (str): `single-token`: the name is one word, which is not searched.
+        code (str): `single-token`: the name is one word, which is not searched. `no-match`: nothing matched closely
+            enough. `publishers-only`: every match is registered only as a publisher or administrator, not as a writer.
         nearest (list[str], may be absent): Up to five registered names closest to the one asked for, as spelling
             suggestions.
         set_aside_roles (list[str], may be absent): For `publishers-only`, the roles of the records set aside:
@@ -368,7 +370,12 @@ class ReviewItem(TypedDict):
         records (list[int]): The two records, by `party_record_id`.
         refs (list[str]): The candidates the two records are in, by `ref`.
         reason (str): `review_band`: the model was unsure, scoring at least `provenance.review_threshold` but below
-            `query.threshold`.
+            `query.threshold`. `middle_name_conflict`: the records give different middle names, and are never joined on
+            the model alone. `generation_suffix_conflict`: the names carry different generations (JR and SR, II and
+            III), and are never joined on the model alone. `korean_same_name_by_sound`: one Korean name written in
+            different romanisations, held apart rather than joined on how it sounds.
+            `blocked_would_join_conflicting_records`: joining would put two conflicting records into one person through
+            a third, so it was held back whatever the probability.
         probability (float | None, may be absent): The model's calibrated probability that the two records are one
             person, from 0 to 1.
         shared (dict[str, Any], may be absent): What the two records have in common, under `co_writers`,
@@ -410,6 +417,8 @@ class SongBeyond(TypedDict):
         ipi_name_number (str | None, may be absent): Its IPI name number, if it has one.
         persistent_id (str | None, may be absent): The person ID holding this record, if any.
         tier (str): `same_name`: the name matches as a lookup's would, beyond the records the lookup compared.
+            `half_name`: only the given name or the surname matches, as with a stage name; offered only for a title few
+            works share.
         titles (list[str]): Its works with this exact title, as registered; at most three.
     """
 
@@ -460,12 +469,16 @@ class SongMatch(TypedDict):
 
     Attributes:
         song (str): The song as sent.
-        match (str): `exact`: a work has this title.
+        match (str): `exact`: a work has this title. `partial`: no exact title, but the song's words appear whole
+            and in order in one (`hurt` in `HURT SO GOOD`), which is weaker evidence. `none`: no one in this answer has
+            a work by that title. `too_short`: the song has no letters or digits to match on.
         candidates (list[str], may be absent): Refs of the candidates holding a match, in the order of `candidates`.
         records (list[SongRecord], may be absent): The matching records, with their titles.
         beyond (list[SongBeyond], may be absent): Writers with a work by this exact title whom the name did not
             find; empty when `beyond_status` is not `ok`.
-        beyond_status (str | None, may be absent): None when this search did not run.
+        beyond_status (str | None, may be absent): None when this search did not run. `ok`: it ran. `none`: no work
+            has this exact title. `common`: too many works share the title to point at anyone. `unavailable`: not
+            offered here yet.
     """
 
     song: str
@@ -612,8 +625,8 @@ class BuildRef(TypedDict):
         model_version (str | None, may be absent): Identifies the model the build used.
         code_commit (str): Identifies the code the build ran.
         code_dirty (bool): True if the build ran with uncommitted changes.
-        mlc_snapshot (str | None, may be absent): The date of the registration-data release the build read, YYYY-MM-
-            DD.
+        mlc_snapshot (str | None, may be absent): The date of the registration-data release the build read,
+            YYYY-MM-DD.
     """
 
     build_id: int
@@ -654,8 +667,8 @@ class PersonProvenance(TypedDict):
     Attributes:
         issued_by (BuildRef | None, may be absent): The build that issued the ID.
         latest_build (BuildRef | None, may be absent): The most recent build to group these records.
-        mlc_snapshot (str | None, may be absent): The date of the registration-data release this answer read, YYYY-
-            MM-DD.
+        mlc_snapshot (str | None, may be absent): The date of the registration-data release this answer read,
+            YYYY-MM-DD.
         api_model_md5 (str): The model serving lookups; not the model that grouped this person.
         api_code_commit (str): The code that served this response.
     """
@@ -689,7 +702,8 @@ class PersonRecord(TypedDict):
         names_before_key_name (str | None, may be absent): The rest of the name, usually given names.
         ipi_name_number (str | None, may be absent): The society (IPI) name number, or None.
         works (int): This record's own works, counted once each.
-        link (str): `anchor`: the record the ID was issued on.
+        link (str): `anchor`: the record the ID was issued on. `asserted`: a member. `possible`: perhaps this
+            person, but not a member.
         rule (str): Why the record was linked: `same_ipi` (the same society number as a member), `ipi` (the anchor's
             own society number), `model` (the model's judgement), `corroborated` (confirmed by an independent outside
             source) or `verdict` (decided by a person).
@@ -821,7 +835,8 @@ class PersonResponse(TypedDict):
         person_id (str): `SLP-XXXX-XXXX-C`; the last character is a check character.
         prerelease (bool): True: the ID may stop resolving, or later point at a different person, without notice, so
             do not store it.
-        state (str): `active`.
+        state (str): `active`. `split`: part of the group was separated and this ID kept the anchor.
+            `anchor_missing`: the anchor record is no longer in the registration data; the ID stays.
         evidence (str): What the ID qualifies on now: `same_ipi` (members share a society number), `ipi` (the
             anchor's society number and catalogue), `corroborated` (a member's society number confirmed by an
             independent outside source) or `human` (decided by a person).
@@ -966,7 +981,9 @@ class WriterAnswer(TypedDict):
 
     Attributes:
         ipi_name_number (str): The number, as 11 digits with its leading zeros.
-        status (str): `person`: one person holds this number.
+        status (str): `person`: one person holds this number. `several`: more than one person holds it, and none is
+            chosen. `none`: no person here holds it; it may belong to a publisher, or its records have not been grouped.
+            `invalid`: not an IPI name number (up to 11 digits; spaces and dashes are ignored).
         person_id (str | None, may be absent): The person's ID, `SLP-XXXX-XXXX-C`; None unless `status` is `person`.
         name (str | None, may be absent): The name to show for the person.
         names (list[str], may be absent): Every distinct name the person's records are registered under, `name`
@@ -977,7 +994,7 @@ class WriterAnswer(TypedDict):
         works_on_main_ipi (int | None, may be absent): Distinct works on the records carrying
             `main_ipi_name_number`.
         works_elsewhere (int | None, may be absent): `works` minus `works_on_main_ipi`: works registered only under
-            another spelling of the name or another IPI name number.
+            another spelling of the name or another IPI name number. None when `works_on_main_ipi` is.
         persons (int, may be absent): How many persons hold this number: 1 for `person`, 2 or more for `several`, 0
             otherwise.
         person_url (str | None, may be absent): The page to open, relative to this site: the person's page, or for
@@ -1098,8 +1115,8 @@ class VersionResponse(TypedDict):
         version (str): The release, as in the site's small print.
         model_md5 (str): Identifies the model serving lookups.
         code_commit (str): Identifies the code serving.
-        mlc_snapshot (str | None, may be absent): The date of the registration-data release this answer read, YYYY-
-            MM-DD.
+        mlc_snapshot (str | None, may be absent): The date of the registration-data release this answer read,
+            YYYY-MM-DD.
         threshold (float): The default `threshold` for a lookup.
         review_threshold (float): The lowest probability at which an unjoined pair is listed in `review`.
         max_candidates (int): The most records one lookup groups.
@@ -1140,7 +1157,7 @@ class ApiError(TypedDict):
 
     Attributes:
         error (str): `too_many` or `no_numbers` (400), `not_found` (404), `internal` (500), or `not_ready` or `busy`
-            (503).
+            (503). Branch on this.
         message (str): A short sentence for people; its wording may change.
     """
 

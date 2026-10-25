@@ -38,9 +38,10 @@ class SonglinksError(Exception):
 class RateLimitedError(SonglinksError):
     """Raised when the API refuses a request because the caller is over a limit (HTTP 429).
 
-    The public API allows about 100 requests per 5 minutes from one address, across every endpoint. When the API asks
-    for a wait of a minute or less, the client waits and retries by itself and raises this only when its retries run
-    out; a longer wait is raised at once, with `retry_after_seconds` saying when to try again.
+    The public API allows about 100 requests per 5 minutes from one address, across every endpoint, and 20 from VPNs,
+    proxies and hosting providers (which includes most cloud servers). When the API asks for a wait of a minute or
+    less, the client waits and retries by itself and raises this only when its retries run out; a longer wait is
+    raised at once, with `retry_after_seconds` the most you need to wait.
 
     Attributes:
         retry_after_seconds: How long the API asked the caller to wait, in seconds, or None when it did not say.

@@ -139,19 +139,34 @@ def ordered(schemas: dict) -> list[str]:
 
 
 def docstring(text: str, indent: str) -> list[str]:
-    body = textwrap.wrap(text.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'), WIDTH - len(indent) - 6)
+    body = textwrap.wrap(
+        text.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'),
+        WIDTH - len(indent) - 6,
+        break_on_hyphens=False,  # never split YYYY-MM-DD or a hyphenated word across lines
+        break_long_words=False,  # nor an escaped backslash, which at a line end would join the lines
+    )
     if len(body) == 1:
         return [f'{indent}"""{body[0]}"""']
     return [f'{indent}"""{body[0]}', *(f"{indent}{line}" for line in body[1:]), f'{indent}"""']
 
 
 def class_docstring(summary: str, attrs: list[str]) -> list[str]:
-    lines = textwrap.wrap(summary.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'), WIDTH - 10)
+    lines = textwrap.wrap(
+        summary.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'),
+        WIDTH - 10,
+        break_on_hyphens=False,
+        break_long_words=False,
+    )
     out = [f'    """{lines[0]}', *(f"    {line}" for line in lines[1:])]
     if attrs:
         out += ["", "    Attributes:"]
         for a in attrs:
-            wrapped = textwrap.wrap(a.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'), WIDTH - 12)
+            wrapped = textwrap.wrap(
+                a.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'),
+                WIDTH - 12,
+                break_on_hyphens=False,
+                break_long_words=False,
+            )
             out += [f"        {wrapped[0]}", *(f"            {w}" for w in wrapped[1:])]
     return out + ['    """']
 
@@ -177,17 +192,13 @@ def render(spec: dict) -> str:
         required = set(schema.get("required", []))
         out += ["", "", f"class {name}(TypedDict):"]
         summary = sentence(schema.get("description") or f"The API's {source} schema.")
-        required = set(schema.get("required", []))
         # The fields again, as a Google-style Attributes section: help() and most editors read only the class
         # docstring, not the per-field docstrings below it (which pdoc and Pylance do read). One line per field, so
         # the section stays a scannable list.
         attrs = []
         for field, prop in schema.get("properties", {}).items():
-            first = re.split(r"(?<=[.!?]) ", OVERRIDES.get((source, field)) or sentence(prop.get("description") or ""))[
-                0
-            ]
-            kind = py_type(prop) if field in required else f"{py_type(prop)}, may be absent"
-            attrs.append(f"{field} ({kind}): {first}")
+            text = OVERRIDES.get((source, field)) or sentence(prop.get("description") or "")
+            attrs.append(f"{field} ({attr_kind(prop, field in required)}): {first_sentence(text)}")
         out += class_docstring(summary, attrs)
         for field, prop in schema.get("properties", {}).items():
             if keyword.iskeyword(field) or not field.isidentifier():
@@ -199,6 +210,26 @@ def render(spec: dict) -> str:
                 raise SystemExit(f"{source}.{field} has no description in the API's document")
             out += docstring(text, "    ")
     return "\n".join(out) + "\n"
+
+
+def attr_kind(prop: dict, required: bool) -> str:
+    return py_type(prop) if required else f"{py_type(prop)}, may be absent"
+
+
+def first_sentence(text: str) -> str:
+    """The Attributes line for a field: its first sentence, or all of it when the sentences list its values.
+
+    A description such as "`person`: one person holds this number. `several`: ... `none`: ..." lists one value per
+    sentence; cutting it after the first would read as if `person` were the only value.
+    """
+    if text.startswith("`") or text.count("`: ") > 1:
+        return text
+    first = re.split(r"(?<=[.!?]) ", text)[0]
+    # An abbreviation would end the "sentence" early, mid-thought; nothing in today's document has one, so this
+    # guards a regenerated one rather than handling it.
+    if re.search(r"\b(e\.g|i\.e|vs|etc)\.$", first):
+        raise SystemExit(f"first sentence ends in an abbreviation, which the Attributes split would cut: {first!r}")
+    return first
 
 
 if __name__ == "__main__":
