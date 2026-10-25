@@ -13,7 +13,8 @@ keeps apart the ones it isn't sure of.
 - **Free, with no key and no sign-up.**
 - **Typed end to end.** Every answer is described by a `TypedDict` generated from the API's own OpenAPI document, so
   your editor and mypy know every field.
-- **No dependencies.** The standard library only, on Python 3.11 and later.
+- **Light.** The standard library, on Python 3.11 and later, plus `certifi` on macOS, used only when Python has no
+  certificates of its own.
 - **Built to be called from real apps.** Typed errors, retries that honour `Retry-After`, and paging done for you.
 
 ```sh

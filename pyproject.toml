@@ -23,8 +23,11 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio",
     "Typing :: Typed",
 ]
-# No runtime dependencies: the client is urllib and json.
-dependencies = []
+# The client is urllib and json. certifi, on macOS only: Python from python.org there ships with no certificates
+# until its "Install Certificates" step is run, so a first program would fail on every HTTPS call. The client reads
+# certifi's list only when the system gives it none (_client._default_context), so where the system store works it
+# is never used.
+dependencies = ['certifi>=2024.8.30; sys_platform == "darwin"']
 
 [project.optional-dependencies]
 dev = ["pytest==8.3.3", "mypy==1.13.0", "ruff==0.7.4", "pdoc==15.0.0", "build==1.2.2", "certifi==2024.8.30"]
