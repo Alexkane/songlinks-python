@@ -145,6 +145,17 @@ def docstring(text: str, indent: str) -> list[str]:
     return [f'{indent}"""{body[0]}', *(f"{indent}{line}" for line in body[1:]), f'{indent}"""']
 
 
+def class_docstring(summary: str, attrs: list[str]) -> list[str]:
+    lines = textwrap.wrap(summary.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'), WIDTH - 10)
+    out = [f'    """{lines[0]}', *(f"    {line}" for line in lines[1:])]
+    if attrs:
+        out += ["", "    Attributes:"]
+        for a in attrs:
+            wrapped = textwrap.wrap(a.replace("\\", "\\\\").replace('"""', '\\"\\"\\"'), WIDTH - 12)
+            out += [f"        {wrapped[0]}", *(f"            {w}" for w in wrapped[1:])]
+    return out + ['    """']
+
+
 def render(spec: dict) -> str:
     schemas = spec["components"]["schemas"]
     out = [
@@ -165,7 +176,19 @@ def render(spec: dict) -> str:
         name = NAMES[source]
         required = set(schema.get("required", []))
         out += ["", "", f"class {name}(TypedDict):"]
-        out += docstring(sentence(schema.get("description") or f"The API's {source} schema."), "    ")
+        summary = sentence(schema.get("description") or f"The API's {source} schema.")
+        required = set(schema.get("required", []))
+        # The fields again, as a Google-style Attributes section: help() and most editors read only the class
+        # docstring, not the per-field docstrings below it (which pdoc and Pylance do read). One line per field, so
+        # the section stays a scannable list.
+        attrs = []
+        for field, prop in schema.get("properties", {}).items():
+            first = re.split(r"(?<=[.!?]) ", OVERRIDES.get((source, field)) or sentence(prop.get("description") or ""))[
+                0
+            ]
+            kind = py_type(prop) if field in required else f"{py_type(prop)}, may be absent"
+            attrs.append(f"{field} ({kind}): {first}")
+        out += class_docstring(summary, attrs)
         for field, prop in schema.get("properties", {}).items():
             if keyword.iskeyword(field) or not field.isidentifier():
                 raise SystemExit(f"{source}.{field} cannot be a TypedDict field name; use the functional syntax")

@@ -9,7 +9,7 @@
 errors are raised as `SonglinksError` and its subclasses.
 """
 
-from ._client import DEFAULT_BASE_URL, WORKS_PAGE_MAX, WRITERS_MAX, Songlinks
+from ._client import DEFAULT_BASE_URL, WORKS_PAGE_MAX, WRITERS_MAX, Songlinks, normalize_ipi
 from ._errors import PersonWithdrawnError, RateLimitedError, SonglinksError
 from ._version import VERSION
 from .models import (
@@ -80,4 +80,5 @@ __all__ = [
     "WriterAnswer",
     "WritersResponse",
     "WritersSummary",
+    "normalize_ipi",
 ]

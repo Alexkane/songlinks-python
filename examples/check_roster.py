@@ -9,7 +9,7 @@ the API takes in one call.
 import csv
 import sys
 
-from songlinks import WRITERS_MAX, Songlinks, WriterAnswer
+from songlinks import WRITERS_MAX, Songlinks, WriterAnswer, normalize_ipi
 
 songlinks = Songlinks(user_agent="songlinks-example/1.0")
 with open(sys.argv[1], newline="") as f:
@@ -24,8 +24,8 @@ for start in range(0, len(rows), WRITERS_MAX):
 out = csv.DictWriter(sys.stdout, [*rows[0].keys(), "status", "person_id", "name", "works"] if rows else ["ipi"])
 out.writeheader()
 for row in rows:
-    # The API answers with the number in its full 11-digit form, so look it up the same way.
-    w = answers.get(row["ipi"].strip().zfill(11))
+    # The answer writes each number as 11 digits, with repeats merged, so look yours up in the same form.
+    w = answers.get(normalize_ipi(row["ipi"].strip()))
     if w is None:
         out.writerow(row)
         continue

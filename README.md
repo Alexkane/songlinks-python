@@ -28,8 +28,10 @@ from songlinks import Songlinks
 songlinks = Songlinks(user_agent="my-app/1.0")
 
 answer = songlinks.lookup("mark hoppus")
-best = answer["candidates"][0]
-print(best["persistent_id"], best["names"], best["works"])
+if answer["answer"] == "rejected":  # for example a one-word name, which matches too many people
+    raise SystemExit(f"no answer: {answer['rejection']['code']}")
+candidate = answer["candidates"][0]
+print(candidate["persistent_id"], candidate["names"], candidate["works"])
 # SLP-ZYM7-GD3E-S ['MARK HOPPUS'] 302
 
 person = songlinks.person("SLP-ZYM7-GD3E-S", works_limit=3)
@@ -37,14 +39,15 @@ print([w["title"] for w in person["works_list"]["items"]])
 # ['I MISS YOU', 'ALL THE SMALL THINGS', 'DOWN']
 
 check = songlinks.writers(["00338980326", "00340247397"])
-# one entry per IPI name number: MARK HOPPUS (SLP-ZYM7-GD3E-S), TRAVIS L BARKER (SLP-MG23-XM9B-Y)
+print([(w["name"], w["person_id"]) for w in check["writers"]])
+# [('MARK HOPPUS', 'SLP-ZYM7-GD3E-S'), ('TRAVIS L BARKER', 'SLP-MG23-XM9B-Y')]
 ```
 
 Every person has a page you can link to, such as [songlinks.io/person/SLP-ZYM7-GD3E-S](https://songlinks.io/person/SLP-ZYM7-GD3E-S).
 It shows the registrations behind the person and what each join rests on.
 
-> **Beta.** Unverified machine output, from a dated snapshot of registration data (every answer's `mlc_snapshot`
-> gives its date). Some answers are wrong and some are incomplete. Not for rights or royalty decisions.
+> **Beta.** Unverified machine output, from a dated snapshot of registration data (a lookup's or a person's
+> `provenance["mlc_snapshot"]` gives its date, and `version()` gives the current one). Some answers are wrong and some are incomplete. Not for rights or royalty decisions.
 
 ### More
 
@@ -52,7 +55,7 @@ It shows the registrations behind the person and what each join rests on.
 # Which of several writers with the same name wrote a song? Pass one of their songs.
 answer = songlinks.lookup("amy allen", song="espresso")
 print(answer["song_match"]["match"], answer["song_match"]["candidates"])
-# exact ['c1']: the Amy Allen credited on that song
+# exact ['c1']: the candidate whose "ref" is "c1" is the Amy Allen credited on that song
 
 # Every work of a person, paged for you.
 for work in songlinks.person_works("SLP-ZYM7-GD3E-S"):
@@ -101,10 +104,19 @@ with `.get()`.
 
 ### Reading an answer
 
+Two words come up throughout. A **person** is a songwriter Songlinks has given a person ID (`SLP-…`), with the
+registrations it holds as theirs; `person()` reads one. A **candidate** is what a lookup returns: the registrations
+that one name reaches, grouped fresh for that query.
+
 - **A lookup candidate is not a stored person.** It is the lookup's own grouping, made for the name you asked.
   `persistent_id` is the stored person when there is exactly one. A candidate whose records belong to more than one
   stored person has no `persistent_id` and lists them in `stored_persons`. Read each record's own `persistent_id`.
+- **A candidate can count more works than its person.** "mark hoppus" reaches two registrations, 302 works between
+  them; the person `SLP-ZYM7-GD3E-S` holds one of them as theirs (294 works) and lists the other as `possible`.
+  `person()` is the authority on what an ID holds.
 - **None is ordinary.** Many records have no person ID yet.
+- **Match a writers check by number, not position.** Repeats and two forms of one number come back as one entry, as
+  11 digits. `normalize_ipi()` turns your input into the same form.
 - **Person IDs can be prerelease.** A prerelease ID may stop resolving, or point at a different person, without notice.
   Check `prerelease` before you store one.
 
@@ -117,13 +129,16 @@ one to branch on), a `message` for people, and the response `body`.
 from songlinks import PersonWithdrawnError, RateLimitedError, SonglinksError
 
 try:
-    songlinks.person("SLP-0000-0000-0")
+    songlinks.person(person_id)
 except PersonWithdrawnError as err:
     print("withdrawn", err.body)  # a 410, and a valid answer to keep
 except RateLimitedError as err:
     print("retry in", err.retry_after_seconds, "s")
 except SonglinksError as err:
-    print(err.status, err.code, err.message)
+    if err.code == "not_found":  # a 404, such as for SLP-0000-0000-0
+        print("no person with that ID")
+    else:
+        print(err.status, err.code, err.message)
 ```
 
 - **Retried automatically:** `429` and `503` answers and network failures, up to `max_retries` times (default 2). A
@@ -147,8 +162,9 @@ A client holds no connection and no state between calls, so one can be shared ac
 
 ## Fair use
 
-The API is free and open. Please send a `user_agent` that names your app, keep to one request at a time per user
-action, and cache answers you reuse. A burst of lookups may be rate-limited; for a whole roster, see
+The API is free and open, and allows about 100 requests per 5 minutes from one address, across every endpoint. Please
+send a `user_agent` that names your app, keep to one request at a time per user action, and cache answers you reuse.
+Over the limit, the SDK raises a `RateLimitedError` whose `retry_after_seconds` says when to try again; for a whole roster, see
 [bulk songwriter lookup](https://songlinks.io/bulk-songwriter-lookup).
 
 ## Links

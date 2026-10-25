@@ -132,7 +132,7 @@ def test_a_validation_error_is_invalid_request(server: Server) -> None:
     server.replies.append((422, {}, {"detail": [{"msg": "bad"}]}))
     with pytest.raises(SonglinksError) as caught:
         client(server).lookup("x", threshold=2)
-    assert (caught.value.code, caught.value.message) == ("invalid_request", "HTTP 422")
+    assert (caught.value.code, caught.value.message) == ("invalid_request", "bad")
 
 
 def test_a_withdrawn_person_raises_with_the_apis_answer(server: Server) -> None:
@@ -158,10 +158,48 @@ def test_a_429_waits_retry_after_and_raises_when_retries_run_out(server: Server)
     assert server.waits == [7.0]  # type: ignore[attr-defined]
 
 
-def test_retry_after_is_capped_at_a_minute(server: Server) -> None:
-    server.replies += [(429, {"Retry-After": "3600"}, None), (200, {}, {})]
+def test_a_wait_longer_than_a_minute_is_raised_at_once(server: Server) -> None:
+    server.replies.append((429, {"Retry-After": "3600"}, None))
+    with pytest.raises(RateLimitedError) as caught:
+        client(server).version()
+    assert caught.value.retry_after_seconds == 3600.0 and len(server.requests) == 1
+
+
+def test_the_edges_429_has_its_wait_only_in_the_body(server: Server) -> None:
+    body = {"error": "rate_limited", "message": "Too many", "retry_after_seconds": 300}
+    server.replies.append((429, {}, body))
+    with pytest.raises(RateLimitedError) as caught:
+        client(server).version()
+    assert caught.value.retry_after_seconds == 300.0 and len(server.requests) == 1
+
+
+def test_a_short_wait_in_the_body_is_waited_out(server: Server) -> None:
+    server.replies += [(429, {}, {"retry_after_seconds": 5}), (200, {}, {})]
     client(server).version()
-    assert server.waits == [60.0]  # type: ignore[attr-defined]
+    assert server.waits == [5.0]  # type: ignore[attr-defined]
+
+
+def test_a_422_says_which_parameter_was_wrong(server: Server) -> None:
+    detail = [{"loc": ["query", "threshold"], "msg": "Input should be less than or equal to 0.99"}]
+    server.replies.append((422, {}, {"detail": detail}))
+    with pytest.raises(SonglinksError) as caught:
+        client(server).lookup("x y", threshold=2)
+    assert caught.value.message == "threshold: Input should be less than or equal to 0.99"
+
+
+def test_an_empty_name_or_id_is_refused_before_any_request(server: Server) -> None:
+    with pytest.raises(ValueError):
+        client(server).lookup(" ")
+    with pytest.raises(ValueError):
+        client(server).person("")
+    assert server.requests == []
+
+
+def test_normalize_ipi_writes_a_number_the_way_the_answer_does() -> None:
+    from songlinks import normalize_ipi
+
+    assert normalize_ipi("338980326") == "00338980326"
+    assert normalize_ipi("003-389-803 26") == "00338980326"
 
 
 def test_other_errors_are_not_retried(server: Server) -> None:
