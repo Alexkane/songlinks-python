@@ -11,15 +11,20 @@ with no number at all. Songlinks groups those registrations into one person, sho
 keeps apart the ones it isn't sure of.
 
 - **Free, with no key and no sign-up.**
-- **Typed end to end.** Every answer is described by a `TypedDict` generated from the API's own OpenAPI document, so
-  your editor and mypy know every field.
+- **Typed end to end.** Your editor knows every field of every answer, with a description of each, taken from the
+  API's own description of itself.
 - **Light.** The standard library, on Python 3.11 and later, plus `certifi` on macOS, used only when Python has no
   certificates of its own.
-- **Built to be called from real apps.** Typed errors, retries that honour `Retry-After`, and paging done for you.
+- **Built for real apps.** Clear errors, automatic retries when the API is busy, and long lists paged for you.
+
+> **New to this?** Skip to [Your first program, step by step](#your-first-program-step-by-step): it starts from
+> installing the language and ends with a working answer. The [words used here](#the-words-used-here) are explained too.
 
 ```sh
-pip install songlinks
+pip install git+https://github.com/Alexkane/songlinks-python
 ```
+
+Not on PyPI yet; once it is, `pip install songlinks` will do the same.
 
 ## Thirty seconds
 
@@ -63,6 +68,124 @@ for work in songlinks.person_works("SLP-ZYM7-GD3E-S"):
     print(work["title"])
 ```
 
+## Your first program, step by step
+
+Never called an API from code before? This takes about five minutes.
+
+**Before you start**, you need two things:
+
+- **A terminal**, where you type commands. On a Mac, open Terminal (in Applications, then Utilities). On Windows, open
+  PowerShell from the Start menu. Type each command below on its own line and press Enter after it.
+- **A plain-text editor** for code, such as the free [Visual Studio Code](https://code.visualstudio.com). A word
+  processor (Word, or TextEdit in its usual mode) adds formatting that stops code from running.
+1. **Install Python** 3.11 or later from [python.org](https://www.python.org/downloads/), and **Git** from
+   [git-scm.com](https://git-scm.com/downloads) (on a Mac, the first `git` command offers to install it: say yes).
+   Check they worked by typing `python3 --version` (on Windows, `py --version`) and `git --version`.
+2. **Make a folder for your project**, with its own Python environment (a "venv": a private copy of Python for this
+   project, so what you install here stays here), and add the SDK to it.
+
+   On a Mac or Linux:
+
+   ```sh
+   mkdir songlinks-test
+   cd songlinks-test
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install git+https://github.com/Alexkane/songlinks-python
+   ```
+
+   On Windows, in PowerShell:
+
+   ```powershell
+   mkdir songlinks-test
+   cd songlinks-test
+   py -m venv .venv
+   .venv\Scripts\activate
+   pip install git+https://github.com/Alexkane/songlinks-python
+   ```
+
+   If PowerShell refuses to run `activate`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then
+   try again. (Once the SDK is on PyPI, `pip install songlinks` will do the same as the last line.)
+
+   **Each time you open a new terminal**, go back into the folder and activate the environment again (`cd
+   songlinks-test`, then the `activate` line) before running your program.
+3. **Create a file** called `first.py` in the `songlinks-test` folder, in your editor, with this in it:
+
+   ```python
+   import sys
+
+   from songlinks import Songlinks
+
+   songlinks = Songlinks(user_agent="my-first-test/1.0")
+   answer = songlinks.lookup(sys.argv[1] if len(sys.argv) > 1 else "mark hoppus")
+
+   if answer["answer"] == "rejected":
+       print("No answer, because:", answer["rejection"]["code"])
+   else:
+       for person in answer["candidates"]:
+           print(person.get("persistent_id") or "(no person ID yet)", ", ".join(person["names"]), f"(works: {person['works']})")
+   ```
+
+   `user_agent` names your program to the API, so a problem can be traced to it; any short name will do.
+   `sys.argv[1]` is the name you type after `first.py` in the next step.
+4. **Run it**, from the same folder, with any songwriter's full name:
+
+   ```sh
+   python first.py "mark hoppus"
+   ```
+
+   You should see `SLP-ZYM7-GD3E-S MARK HOPPUS (works: 302)`.
+
+   **Keep the quotes** around the name: without them, only the first word is sent.
+
+   **What you might see instead:**
+   - **Several lines.** The name could belong to more than one person, so each possible person gets a line.
+   - **`(no person ID yet)`.** Songlinks found the registrations but hasn't given that person an ID yet. That is
+     normal, and the rest of the line is still the answer.
+   - **`No answer, because: single-token`.** The name is one word, such as `madonna`, which matches too many people.
+     Use the full name.
+   - **`No answer, because: no-match`.** Nothing registered is close to that name. Check the spelling.
+
+From here, the [examples](#examples) do real jobs: download one from the
+[examples folder on GitHub](https://github.com/Alexkane/songlinks-python/tree/main/examples) into your folder and
+run it the same way. [Reading an answer](#reading-an-answer) explains what comes back, and the
+[words used here](#the-words-used-here) are explained just below.
+
+## The words used here
+
+Music-publishing words, which you'll meet in the answers:
+
+- **Songwriter registration**: when a song is written, its publisher registers it so royalties reach the people who
+  wrote it. Each registration names the writers, as typed by whoever filed it. One songwriter can therefore appear
+  under several spellings, and two different songwriters can share a name.
+- **Record**: one of those registered writer entries: a name as it was typed, with its IPI name number if it has one,
+  and the songs (works) registered under it.
+- **IPI name number**: an 11-digit number that identifies a songwriter or publisher to collecting societies, such as
+  `00338980326`. Many records have none, and one person can have several.
+  [More about IPI name numbers](https://songlinks.io/guides/ipi-name-numbers).
+- **Work**: a song as a composition (the melody and lyrics), as opposed to a particular recording of it.
+- **ISWC**: the international code for a work, such as `T0719661581`. Not every registered work has one.
+- **Person** and **person ID**: Songlinks groups the records it judges to be one human into a person and gives them a
+  person ID, such as `SLP-ZYM7-GD3E-S`. Every person has a page, such as
+  [songlinks.io/person/SLP-ZYM7-GD3E-S](https://songlinks.io/person/SLP-ZYM7-GD3E-S).
+- **Candidate**: what a lookup by name returns: the records that name reaches, grouped into people for that one
+  question. A candidate usually matches one person ID, but it is worked out fresh each time.
+- **Evidence**: why two records were grouped: the same IPI name number, or a judgement that they are the same person
+  (for example, the same co-writers and publishers).
+- **Rejected**: a lookup that gave no candidates, with a reason, such as a one-word name (`madonna`) that matches too
+  many people to group. It is an answer, not an error.
+
+Programming words:
+
+- **API**: a service that programs talk to over the internet. The Songlinks API answers questions such as "who is
+  this songwriter?".
+- **SDK**: this library. It does the talking to the API for you, so your code calls a function instead of building
+  web requests by hand.
+- **Rate limit**: the most requests the API accepts from one internet address in a stretch of time: about 100 every
+  5 minutes, or 20 from VPNs and cloud servers. Over it, the SDK tells you how long to wait.
+- **venv**: a private copy of Python for one project, so what you install there doesn't affect anything else.
+- **pip**: the tool that downloads Python libraries, such as this one, into your venv.
+
 ## Checking a whole roster?
 
 The API answers one name at a time, which suits an app. If you administer a catalogue, send us the writers instead.
@@ -105,9 +228,7 @@ with `.get()`.
 
 ### Reading an answer
 
-Two words come up throughout. A **person** is a songwriter Songlinks has given a person ID (`SLP-…`), with the
-registrations it holds as theirs; `person()` reads one. A **candidate** is what a lookup returns: the registrations
-that one name reaches, grouped fresh for that query.
+A **person** and a **candidate** are different things: see [the words used here](#the-words-used-here).
 
 - **A lookup candidate is not a stored person.** It is the lookup's own grouping, made for the name you asked.
   `persistent_id` is the stored person when there is exactly one. A candidate whose records belong to more than one
@@ -129,6 +250,8 @@ one to branch on), a `message` for people, and the response `body`.
 ```python
 from songlinks import PersonWithdrawnError, RateLimitedError, SonglinksError
 
+# Continuing from the code above, where `songlinks` was created.
+person_id = "SLP-0000-0000-0"  # an ID no one holds, to see the not-found branch
 try:
     songlinks.person(person_id)
 except PersonWithdrawnError as err:

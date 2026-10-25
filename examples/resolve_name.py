@@ -13,12 +13,10 @@ answer = songlinks.lookup(sys.argv[1] if len(sys.argv) > 1 else "mark hoppus")
 if answer["answer"] == "rejected":
     # Not an error: the API explains why it gave no candidates, such as a name too common to group.
     rejection = answer.get("rejection")
-    print(
-        "No answer:",
-        rejection["code"] if rejection else "rejected",
-        "- nearest:",
-        rejection and rejection.get("nearest"),
-    )
+    print("No answer:", rejection["code"] if rejection else "rejected")
+    # nearest suggests registered names close to the one asked, when there are any.
+    if rejection and rejection.get("nearest"):
+        print("Did you mean:", ", ".join(rejection["nearest"]))
     sys.exit()
 
 for person in answer.get("candidates", []):

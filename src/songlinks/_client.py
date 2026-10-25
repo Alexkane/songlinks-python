@@ -211,8 +211,9 @@ class Songlinks:
             For each distinct number, the person who holds it and a status, with totals in `summary`.
 
         Raises:
-            TypeError: When given one string rather than a list of them.
-            ValueError: When the list is empty or holds more than 50 numbers.
+            TypeError: When given one string rather than a list of them, or an entry that is not a string.
+            ValueError: When the list is empty, holds more than 50 numbers, or has an entry holding a comma,
+                semicolon, line break or the text `%2C` (which the API would read as several numbers).
             SonglinksError: When the API answers with an error.
         """
         # A bare string is a Sequence[str] too, and would be sent one digit per number.
@@ -222,6 +223,16 @@ class Songlinks:
             raise ValueError("writers() needs at least one IPI name number")
         if len(ipi_name_numbers) > WRITERS_MAX:
             raise ValueError(f"writers() takes at most {WRITERS_MAX} IPI name numbers per call")
+        for n in ipi_name_numbers:
+            if not isinstance(n, str):
+                raise TypeError(
+                    f"writers() takes IPI name numbers as text, got {n!r}: an int would lose its leading zeros"
+                )
+            # The API splits its list on these, and on the text %2C, so one entry holding one would be read as
+            # several. The edges are trimmed first, as the API trims them, so a line from a Windows file passes.
+            inner = n.strip()
+            if any(c in inner for c in ",;\r\n") or "%2c" in inner.lower():
+                raise ValueError(f"writers() takes one IPI name number per entry, got {n!r}")
         return cast(WritersResponse, self._get("/v1/writers", {"ipi": ",".join(ipi_name_numbers)}))
 
     def version(self) -> VersionResponse:
@@ -287,8 +298,10 @@ _CERT_HINT = (
 def _default_context() -> ssl.SSLContext:
     context = ssl.create_default_context()
     # Python from python.org on macOS ships with no certificates loaded, so every HTTPS call fails until its
-    # "Install Certificates" step is run. When the system gave none and certifi is installed, use certifi's. Only
-    # then: certifi replaces the system's list, which would drop a company's own certificates where they exist.
+    # "Install Certificates" step is run. When the context holds none and certifi is installed, certifi's are added.
+    # Adding never removes what the system trusts, so a company's own certificates still work; it runs only then
+    # because elsewhere the system's list is the one to trust. (A system that keeps its certificates in a directory,
+    # read only when needed, also counts 0 here, and gets certifi's added beside them, which is harmless.)
     if context.cert_store_stats()["x509_ca"] == 0:
         try:
             import certifi

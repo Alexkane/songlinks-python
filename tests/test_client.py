@@ -118,6 +118,17 @@ def test_writers_joins_the_list_and_refuses_a_bad_one(server: Server) -> None:
         client(server).writers(["1"] * (WRITERS_MAX + 1))
     with pytest.raises(TypeError):
         client(server).writers("00338980326")  # type: ignore[arg-type]
+    for bad in ["338980326,00340247397", "338980326;1", "338980326\n1", "338980326%2C1"]:
+        with pytest.raises(ValueError):
+            client(server).writers([bad])
+    with pytest.raises(TypeError):
+        client(server).writers([338980326])  # type: ignore[list-item]
+
+
+def test_writers_accepts_a_line_from_a_windows_file(server: Server) -> None:
+    server.replies.append((200, {}, {"writers": []}))
+    client(server).writers(["338980326\r"])
+    assert len(server.requests) == 1
 
 
 def test_an_error_carries_the_apis_code(server: Server) -> None:
@@ -215,6 +226,7 @@ def test_normalize_ipi_writes_a_number_the_way_the_answer_does() -> None:
     assert normalize_ipi("003-389-803 26") == "00338980326"
     assert normalize_ipi("\t003\u2013389803 26") == "00338980326"  # a tab and an en dash
     assert normalize_ipi(" abc ") == "abc"  # invalid: echoed trimmed, as the API does
+    assert normalize_ipi("003\u00a0389\u00a0803\u00a026") == "00338980326"  # non-breaking spaces
     assert normalize_ipi("15036818.0") == "15036818.0"
     assert normalize_ipi("123456789012") == "123456789012"
 
