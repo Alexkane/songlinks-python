@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "songlinks"
+version = "0.1.0"
+description = "The official Python SDK for the Songlinks API: find the songwriter behind a name."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "Kane Technology Group, LLC" }]
+keywords = ["songwriter", "music", "publishing", "ipi", "mlc", "royalties", "metadata", "songlinks"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Typing :: Typed",
+]
+# No runtime dependencies: the client is urllib and json.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.3", "mypy==1.13.0", "ruff==0.7.4", "pdoc==15.0.0", "build==1.2.2", "certifi==2024.8.30"]
+
+[project.urls]
+Homepage = "https://songlinks.io"
+Documentation = "https://songlinks.io/v1/docs"
+Source = "https://github.com/Alexkane/songlinks-python"
+Issues = "https://github.com/Alexkane/songlinks-python/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/songlinks"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "scripts", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# D: every public module, class, method and function has a docstring, in Google style.
+select = ["E", "F", "W", "I", "UP", "B", "D"]
+pydocstyle.convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests and the generator are not the SDK's public surface.
+"tests/**" = ["D"]
+"scripts/**" = ["D"]
+# models.py is the API's own prose, and some schemas open with a sentence longer than a line, which D205 would split.
+"src/songlinks/models.py" = ["D205"]
+
+[tool.mypy]
+strict = true
+# The package and its examples are strict, so an example that misreads a field fails the build; tests poke at private modules and fake answers, which strict typing would only obscure.
+files = ["src", "examples"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

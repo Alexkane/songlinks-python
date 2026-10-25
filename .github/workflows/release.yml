@@ -1,0 +1,20 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # PyPI trusted publishing: PyPI checks this repository and workflow, so no token is stored anywhere. It needs the
+    # project's trusted publisher set up once on pypi.org (repository Alexkane/songlinks-python, workflow release.yml,
+    # environment pypi).
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build==1.2.2 && python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1

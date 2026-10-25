@@ -1,0 +1,23 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e '.[dev]'
+      # Lint includes the docstring rules (ruff D, Google style): an undocumented public name fails here.
+      - run: ruff check . && ruff format --check .
+      - run: mypy
+      - run: pytest -q
+      # The rendered docs must build; a docstring pdoc cannot parse fails here rather than on the published page.
+      - run: pdoc songlinks -d google -o docs
+      - run: python -m build
