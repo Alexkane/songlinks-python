@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "songlinks"
 version = "0.1.0"
-description = "The official Python SDK for the Songlinks API: find the songwriter behind a name."
+description = "Official Python SDK for the Songlinks API: look up a songwriter by name or IPI name number and get the person behind every registration, with their works and ISWCs."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Kane Technology Group, LLC" }]
-keywords = ["songwriter", "music", "publishing", "ipi", "mlc", "royalties", "metadata", "songlinks"]
+keywords = ["songwriter", "music", "publishing", "ipi", "ipi name number", "iswc", "mlc", "royalties", "metadata", "songlinks", "sdk"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
