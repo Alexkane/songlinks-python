@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from songlinks import (
+    SONGWRITERS_MAX,
     WRITERS_MAX,
     PersonWithdrawnError,
     RateLimitedError,
@@ -129,6 +130,59 @@ def test_writers_accepts_a_line_from_a_windows_file(server: Server) -> None:
     server.replies.append((200, {}, {"writers": []}))
     client(server).writers(["338980326\r"])
     assert len(server.requests) == 1
+
+
+def test_songwriters_joins_the_list_and_refuses_a_bad_one(server: Server) -> None:
+    server.replies.append((200, {}, {"recordings": []}))
+    client(server).songwriters(["USMC19959123", "us-sm1-95-00008"])
+    path, query, _ = server.requests[0]
+    assert (path, query) == ("/v1/songwriters", {"isrc": ["USMC19959123,us-sm1-95-00008"]})
+    with pytest.raises(ValueError):
+        client(server).songwriters([])
+    with pytest.raises(ValueError):
+        client(server).songwriters(["USMC19959123"] * (SONGWRITERS_MAX + 1))
+    with pytest.raises(TypeError):
+        client(server).songwriters("USMC19959123")  # type: ignore[arg-type]
+    for bad in ["USMC19959123,USSM19500008", "USMC19959123;x", "USMC19959123\nx", "USMC19959123%2cx"]:
+        with pytest.raises(ValueError):
+            client(server).songwriters([bad])
+    with pytest.raises(TypeError):
+        client(server).songwriters([19959123])  # type: ignore[list-item]
+    assert len(server.requests) == 1, "every refusal is made before a request"
+
+
+def test_songwriters_takes_fifty_and_a_line_from_a_windows_file(server: Server) -> None:
+    server.replies += [(200, {}, {"recordings": []}), (200, {}, {"recordings": []})]
+    client(server).songwriters(["USMC19959123"] * SONGWRITERS_MAX)
+    # Spaces and dashes sit inside an ISRC as people write one; they are not separators, so they pass.
+    client(server).songwriters(["US-MC1-99 59123\r"])
+    assert len(server.requests) == 2
+
+
+def test_songwriters_returns_the_answer_as_parsed(server: Server) -> None:
+    import json
+    import pathlib
+
+    answer = json.loads((pathlib.Path(__file__).parent / "fixtures" / "songwriters.json").read_text())
+    server.replies.append((200, {}, answer))
+    got = client(server).songwriters(["USMC19959123", "nope"])
+    assert got == answer
+    assert [r["status"] for r in got["recordings"]] == ["registered", "invalid"]
+
+
+def test_normalize_isrc_writes_an_isrc_the_way_the_answer_does() -> None:
+    from songlinks import normalize_isrc
+
+    assert normalize_isrc("USMC19959123") == "USMC19959123"
+    assert normalize_isrc("us-mc1-99-59123") == "USMC19959123"
+    assert normalize_isrc(" US MC1 99 59123\t") == "USMC19959123"
+    assert normalize_isrc("US\u00a0MC1\u00a099\u00a059123") == "USMC19959123"  # non-breaking spaces
+    assert normalize_isrc(" nope ") == "nope"  # invalid: echoed trimmed, as the API does
+    assert normalize_isrc("US\u2013MC1\u201399\u201359123") == "US\u2013MC1\u201399\u201359123"  # en dash: invalid
+    assert normalize_isrc("USMC1995912") == "USMC1995912"  # 11 characters
+    assert normalize_isrc("USMC1995912A") == "USMC1995912A"  # a letter in the last seven
+    assert normalize_isrc("1SMC19959123") == "1SMC19959123"  # a digit in the country code
+    assert normalize_isrc("x" * 40) == "x" * 32
 
 
 def test_an_error_carries_the_apis_code(server: Server) -> None:

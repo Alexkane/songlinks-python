@@ -31,6 +31,10 @@ __all__ = [
     "WritersResponse",
     "WriterAnswer",
     "WritersSummary",
+    "SongwritersResponse",
+    "RecordingAnswer",
+    "RecordingWork",
+    "RecordingWriter",
     "VersionResponse",
     "ApiError",
     "RateLimited",
@@ -1109,6 +1113,110 @@ class WritersResponse(TypedDict):
 
     summary: WritersSummary
     """Totals over `writers`."""
+
+    rate_limit: NotRequired[RateLimit | None]
+    """Your remaining allowance; None when no per-caller limit is in force."""
+
+
+class RecordingWriter(TypedDict):
+    """One writer registered on a work the recording is registered to, and the person whose record it is.
+
+    Attributes:
+        party_record_id (int): Identifies the writer's registration record, as in a lookup's records.
+        name (str | None, may be absent): The name as registered.
+        ipi_name_number (str | None, may be absent): The record's IPI name number, or None when it has none.
+        role (str): The writer's role on the work, such as `ComposerLyricist`, `Composer` or `Lyricist`.
+        persistent_id (str | None, may be absent): The person ID this record belongs to, `SLP-XXXX-XXXX-C`; None
+            when the record is not part of a stored person yet.
+        person_url (str | None, may be absent): The person's page, as a path on songlinks.io such as
+            `/person/SLP-ZYM7-GD3E-S`: put `https://songlinks.io` in front of it to open it.
+    """
+
+    party_record_id: int
+    """Identifies the writer's registration record, as in a lookup's records."""
+
+    name: NotRequired[str | None]
+    """The name as registered."""
+
+    ipi_name_number: NotRequired[str | None]
+    """The record's IPI name number, or None when it has none."""
+
+    role: str
+    """The writer's role on the work, such as `ComposerLyricist`, `Composer` or `Lyricist`."""
+
+    persistent_id: NotRequired[str | None]
+    """The person ID this record belongs to, `SLP-XXXX-XXXX-C`; None when the record is not part of a stored person
+    yet.
+    """
+
+    person_url: NotRequired[str | None]
+    """The person's page, as a path on songlinks.io such as `/person/SLP-ZYM7-GD3E-S`: put `https://songlinks.io` in
+    front of it to open it. None when `persistent_id` is.
+    """
+
+
+class RecordingWork(TypedDict):
+    """One work (a song as a composition) the recording is registered to.
+
+    Attributes:
+        song_code (str): The work's song code in the registration data.
+        title (str | None, may be absent): The registered title.
+        iswc (str | None, may be absent): The work's ISWC, or None when the work has none.
+        writers (list[RecordingWriter]): The writers registered on the work; publishers and administrators are left
+            out.
+    """
+
+    song_code: str
+    """The work's song code in the registration data."""
+
+    title: NotRequired[str | None]
+    """The registered title."""
+
+    iswc: NotRequired[str | None]
+    """The work's ISWC, or None when the work has none."""
+
+    writers: list[RecordingWriter]
+    """The writers registered on the work; publishers and administrators are left out."""
+
+
+class RecordingAnswer(TypedDict):
+    """One ISRC from the list: the works it is registered to and their writers.
+
+    Attributes:
+        isrc (str): The ISRC as 12 characters, upper case, without dashes.
+        status (str): `registered`: the recording is registered to at least one work. `unregistered`: it is
+            registered to no work in this data. `invalid`: not an ISRC (two letters, three letters or digits, seven
+            digits; dashes and spaces are ignored).
+        works (list[RecordingWork], may be absent): The works the recording is registered to; empty unless `status`
+            is `registered`.
+    """
+
+    isrc: str
+    """The ISRC as 12 characters, upper case, without dashes. For an `invalid` entry, the text as sent, cut to 32
+    characters.
+    """
+
+    status: str
+    """`registered`: the recording is registered to at least one work. `unregistered`: it is registered to no work in
+    this data. `invalid`: not an ISRC (two letters, three letters or digits, seven digits; dashes and spaces are
+    ignored).
+    """
+
+    works: NotRequired[list[RecordingWork]]
+    """The works the recording is registered to; empty unless `status` is `registered`."""
+
+
+class SongwritersResponse(TypedDict):
+    """The writers behind a list of recordings, by ISRC, in the order sent.
+
+    Attributes:
+        recordings (list[RecordingAnswer]): One entry per distinct ISRC, in the order first sent.
+        rate_limit (RateLimit | None, may be absent): Your remaining allowance; None when no per-caller limit is in
+            force.
+    """
+
+    recordings: list[RecordingAnswer]
+    """One entry per distinct ISRC, in the order first sent."""
 
     rate_limit: NotRequired[RateLimit | None]
     """Your remaining allowance; None when no per-caller limit is in force."""

@@ -20,12 +20,16 @@ from .models import (
     PersonResponse,
     PersonWithdrawnResponse,
     PersonWork,
+    SongwritersResponse,
     VersionResponse,
     WritersResponse,
 )
 
 WRITERS_MAX = 50
 """The most IPI name numbers `/v1/writers` accepts in one call."""
+
+SONGWRITERS_MAX = 50
+"""The most ISRCs `/v1/songwriters` accepts in one call."""
 
 WORKS_PAGE_MAX = 200
 """The most works one person read returns; `Songlinks.person_works` pages through the rest."""
@@ -59,6 +63,38 @@ def normalize_ipi(ipi_name_number: str) -> str:
     if re.fullmatch(r"[0-9]{1,11}", digits):
         return digits.zfill(11)
     return ipi_name_number.strip()[:32]
+
+
+def normalize_isrc(isrc: str) -> str:
+    """Write an ISRC the way `Songlinks.songwriters` answers do, to match the answers to the ISRCs you sent.
+
+    Spaces and dashes are dropped and letters are upper-cased: `us-mc1-99-59123` and `USMC1 99 59123` both become
+    `USMC19959123`. Anything that is then not an ISRC (two letters, three letters or digits, seven digits) is returned
+    trimmed (to 32 characters), as the API echoes it with status `invalid`. Only the plain dash `-` is dropped: a
+    typographic dash, such as the `–` a spreadsheet may substitute, makes the entry invalid, as it does for the API.
+
+    Args:
+        isrc: An ISRC as you have it, such as `USMC19959123` or `US-MC1-99-59123`.
+
+    Returns:
+        The ISRC as 12 characters, such as `USMC19959123`, or the trimmed input when it is not one.
+    """
+    # The same reading as the API's own (writer/work_pages.py isrc_key), character for character, so the answer's
+    # `isrc` and this function agree on every input. That is why it is not stricter or kinder than the API: `\d`
+    # matches any Unicode digit there too, and the typographic dashes normalize_ipi drops are kept.
+    key = re.sub(r"[\s-]", "", isrc).upper()
+    if re.fullmatch(r"[A-Z]{2}[A-Z0-9]{3}\d{7}", key):
+        return key
+    return isrc.strip()[:32]
+
+
+def _one_per_entry(method: str, what: str, entries: Sequence[str]) -> None:
+    """Refuse an entry the API would read as several: it splits its list on `,`, `;`, line breaks and the text `%2C`."""
+    for entry in entries:
+        # The edges are trimmed first, as the API trims them, so a line from a Windows file (ending in \r) passes.
+        inner = entry.strip()
+        if any(c in inner for c in ",;\r\n") or "%2c" in inner.lower():
+            raise ValueError(f"{method}() takes one {what} per entry, got {entry!r}")
 
 
 class Songlinks:
@@ -228,12 +264,55 @@ class Songlinks:
                 raise TypeError(
                     f"writers() takes IPI name numbers as text, got {n!r}: an int would lose its leading zeros"
                 )
-            # The API splits its list on these, and on the text %2C, so one entry holding one would be read as
-            # several. The edges are trimmed first, as the API trims them, so a line from a Windows file passes.
-            inner = n.strip()
-            if any(c in inner for c in ",;\r\n") or "%2c" in inner.lower():
-                raise ValueError(f"writers() takes one IPI name number per entry, got {n!r}")
+        _one_per_entry("writers", "IPI name number", ipi_name_numbers)
         return cast(WritersResponse, self._get("/v1/writers", {"ipi": ",".join(ipi_name_numbers)}))
+
+    def songwriters(self, isrcs: Sequence[str]) -> SongwritersResponse:
+        """Find who wrote up to 50 recordings at once, by ISRC.
+
+        For each recording: the works (songs) it is registered to, the writers registered on each work, and each
+        writer's person ID where they have one, which `person()` reads for everything else they wrote. Publishers are
+        left out.
+
+        The API refuses a longer list rather than shortening it, and so does this method: for more, call it once for
+        each batch of `SONGWRITERS_MAX`.
+
+        The answer has one entry per distinct ISRC, in the order each was first sent, written as 12 characters in
+        upper case with no dashes. Two forms of one ISRC (`US-MC1-99-59123` and `usmc19959123`) and repeats come back
+        as one entry, so match answers to your list by ISRC, not by position: `normalize_isrc` turns your input into
+        the form the answer uses.
+
+        Each entry's `status` is `registered` (its `works` are listed), `unregistered` (no work in the registration
+        data names this recording, which is an answer, not an error) or `invalid` (not an ISRC; the entry echoes what
+        you sent, and the rest of the list is still answered).
+
+        Args:
+            isrcs: The ISRCs to look up, such as `["USMC19959123"]`. Case does not matter, and spaces and dashes are
+                ignored.
+
+        Returns:
+            For each distinct ISRC, its status and the works it is registered to, with their writers.
+
+        Raises:
+            TypeError: When given one string rather than a list of them, or an entry that is not a string.
+            ValueError: When the list is empty, holds more than 50 entries (repeats included), or has an entry
+                holding a comma, semicolon, line break or the text `%2C` (which the API would read as several ISRCs).
+            SonglinksError: When the API answers with an error.
+        """
+        # A bare string is a Sequence[str] too, and would be sent one character per ISRC.
+        if isinstance(isrcs, str):
+            raise TypeError("songwriters() takes a list of ISRCs, not one string")
+        if not isrcs:
+            raise ValueError("songwriters() needs at least one ISRC")
+        # The API counts after folding repeats, so it would take a longer list with repeats in it; this counts what
+        # was passed, as writers() does, so whether a call is refused never depends on how the API reads the entries.
+        if len(isrcs) > SONGWRITERS_MAX:
+            raise ValueError(f"songwriters() takes at most {SONGWRITERS_MAX} ISRCs per call")
+        for isrc in isrcs:
+            if not isinstance(isrc, str):
+                raise TypeError(f"songwriters() takes ISRCs as text, got {isrc!r}")
+        _one_per_entry("songwriters", "ISRC", isrcs)
+        return cast(SongwritersResponse, self._get("/v1/songwriters", {"isrc": ",".join(isrcs)}))
 
     def version(self) -> VersionResponse:
         """Ask what is serving.

@@ -32,3 +32,11 @@ def test_writers_and_version(songlinks: Songlinks) -> None:
     check = songlinks.writers(["00338980326"])
     assert check["writers"][0].get("person_id") == HOPPUS
     assert songlinks.version()["version"]
+
+
+def test_songwriters(songlinks: Songlinks) -> None:
+    answer = songlinks.songwriters(["US-MC1-99-59123", "nope"])
+    first, second = answer["recordings"]
+    assert (first["isrc"], first["status"], second["status"]) == ("USMC19959123", "registered", "invalid")
+    writers = [w for work in first.get("works", []) for w in work["writers"]]
+    assert any(w.get("persistent_id") == HOPPUS for w in writers)

@@ -90,6 +90,7 @@ def conforms(value: typing.Any, hint: typing.Any, path: str) -> None:
         ("lookup-two-persons.json", models.LookupResponse),
         ("person.json", models.PersonResponse),
         ("writers.json", models.WritersResponse),
+        ("songwriters.json", models.SongwritersResponse),
         ("version.json", models.VersionResponse),
     ],
 )

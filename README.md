@@ -4,7 +4,8 @@
 [![ci](https://github.com/Alexkane/songlinks-python/actions/workflows/ci.yml/badge.svg)](https://github.com/Alexkane/songlinks-python/actions/workflows/ci.yml)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-**Find the songwriter behind a name.** The official Python SDK for [Songlinks](https://songlinks.io).
+**Find the songwriter behind a name, an IPI name number or a recording's ISRC.** The official Python SDK for
+[Songlinks](https://songlinks.io).
 
 One songwriter is rarely one record. They're registered under different spellings, under several IPI name numbers, or
 with no number at all. Songlinks groups those registrations into one person, shows the evidence for every join, and
@@ -47,6 +48,11 @@ print([w["title"] for w in person["works_list"]["items"]])
 check = songlinks.writers(["00338980326", "00340247397"])
 print([(w["name"], w["person_id"]) for w in check["writers"]])
 # [('MARK HOPPUS', 'SLP-ZYM7-GD3E-S'), ('TRAVIS L BARKER', 'SLP-MG23-XM9B-Y')]
+
+recording = songlinks.songwriters(["USMC19959123"])["recordings"][0]
+for work in recording.get("works", []):
+    print(work["title"], [w.get("persistent_id") for w in work["writers"]])
+# ALL THE SMALL THINGS ['SLP-ZYM7-GD3E-S', 'SLP-MG23-XM9B-Y', 'SLP-MEA6-3QQJ-C']
 ```
 
 Every person has a page you can link to, such as [songlinks.io/person/SLP-ZYM7-GD3E-S](https://songlinks.io/person/SLP-ZYM7-GD3E-S).
@@ -67,6 +73,49 @@ print(answer["song_match"]["match"], answer["song_match"]["candidates"])
 for work in songlinks.person_works("SLP-ZYM7-GD3E-S"):
     print(work["title"])
 ```
+
+### Who wrote a recording? Look it up by ISRC
+
+Give `songwriters()` up to 50 ISRCs (the codes on recordings: see [the words used here](#the-words-used-here)). For each
+one you get the works (songs) the recording is registered to, the writers registered on each work, and each writer's
+person ID, which leads to everything else they wrote.
+
+```python
+from songlinks import normalize_isrc
+
+mine = ["US-MC1-99-59123", "nope"]
+answer = songlinks.songwriters(mine)
+# One entry per distinct ISRC, written as 12 characters in upper case, so match by ISRC rather than by position.
+by_isrc = {r["isrc"]: r for r in answer["recordings"]}
+for isrc in mine:
+    recording = by_isrc[normalize_isrc(isrc)]
+    print(isrc, recording["status"])
+    for work in recording.get("works", []):
+        for writer in work["writers"]:
+            print("   ", work["title"], writer.get("name"), writer["role"], writer.get("persistent_id"))
+# US-MC1-99-59123 registered
+#     ALL THE SMALL THINGS MARK HOPPUS ComposerLyricist SLP-ZYM7-GD3E-S
+#     ALL THE SMALL THINGS TRAVIS L BARKER ComposerLyricist SLP-MG23-XM9B-Y
+#     ALL THE SMALL THINGS THOMAS DELONGE ComposerLyricist SLP-MEA6-3QQJ-C
+# nope invalid
+```
+
+Each recording's `status` is one of:
+
+- **`registered`**: the recording is registered to at least one work, and `works` lists them with their writers.
+  Usually there is one; some recordings are registered to more than one work.
+- **`unregistered`**: no work in the registration data names this recording. It is an answer, not an error: the
+  recording may be new, or its song may be registered without a link to it.
+- **`invalid`**: the entry is not an ISRC (two letters, three letters or digits, then seven digits, once spaces and
+  dashes are removed). Its `isrc` is the text you sent, and the rest of your list is still answered.
+
+**A writer's person ID can be None, and often is.** Nearly half (about 45%) of registered recordings have at least
+one writer with no `persistent_id`. That happens when the writer's record hasn't been grouped into a stored person,
+for example because it was registered with no IPI name number (its `ipi_name_number` is None too). The writer's name
+and role are still the answer; to look further, pass the name to `lookup()`.
+
+Writers only: publishers and administrators are left out, and so are ownership shares. A work's `iswc` is None when
+the registration has none.
 
 ## Your first program, step by step
 
@@ -165,6 +214,10 @@ Music-publishing words, which you'll meet in the answers:
   [More about IPI name numbers](https://songlinks.io/guides/ipi-name-numbers).
 - **Work**: a song as a composition (the melody and lyrics), as opposed to a particular recording of it.
 - **ISWC**: the international code for a work, such as `T0719661581`. Not every registered work has one.
+- **ISRC**: the international code for one recording, such as `USMC19959123` (often written with dashes:
+  `US-MC1-99-59123`). An ISWC names the song as written; an ISRC names one recording of it, so a song with a cover
+  version, a live take and a remaster has one ISWC and several ISRCs. The label or distributor that released a
+  recording can tell you its ISRC.
 - **Person** and **person ID**: Songlinks groups the records it judges to be one human into a person and gives them a
   person ID, such as `SLP-ZYM7-GD3E-S`. Every person has a page, such as
   [songlinks.io/person/SLP-ZYM7-GD3E-S](https://songlinks.io/person/SLP-ZYM7-GD3E-S).
@@ -202,6 +255,7 @@ Runnable scripts for the jobs people use Songlinks for, each under 40 lines. Cop
 | [`resolve_name.py`](examples/resolve_name.py) | Every person a name could be, with their registrations and what joined them. |
 | [`which_namesake.py`](examples/which_namesake.py) | Two writers share a name: which one wrote this song? |
 | [`check_roster.py`](examples/check_roster.py) | A CSV of IPI name numbers in, the same CSV out with who holds each and their works. |
+| [`recording_writers.py`](examples/recording_writers.py) | A CSV of ISRCs in, one row per writer out, with the work, role and person ID. |
 | [`export_catalogue.py`](examples/export_catalogue.py) | Every work of a person, as CSV. |
 
 ```sh
@@ -218,13 +272,14 @@ The examples are type-checked with the package, so one that misreads a field fai
 | `person(id, *, works_offset=, works_limit=)` | `GET /v1/person/{id}` | One person: their registrations, names, IPI name numbers and a page of works. |
 | `person_works(id, page_size=200)` | `GET /v1/person/{id}` | Every work of a person, as an iterator over the pages. |
 | `writers(ipi_name_numbers)` | `GET /v1/writers` | Up to 50 IPI name numbers checked at once: the stored person behind each. |
+| `songwriters(isrcs)` | `GET /v1/songwriters` | Up to 50 recordings by ISRC: the works each is registered to, their writers, and the person behind each. |
 | `version()` | `GET /v1/version` | What is serving: the release, the model and the date of the registration data. |
 
 Answers are the API's JSON, parsed into ordinary dicts and lists, under the API's own field names. Store one with
 `json.dumps`. Their types are in `songlinks.models` and exported from `songlinks` (`LookupResponse`, `PersonResponse`,
-`Cluster`, `WritersResponse` and the rest). Two are renamed: the API's `Record` is `LookupRecord` and its `Error` is
-`ApiError`. A field marked `NotRequired` may be absent; one typed `X | None` may be present and None. Read the first
-with `.get()`.
+`Cluster`, `WritersResponse`, `SongwritersResponse` and the rest). Two are renamed: the API's `Record` is
+`LookupRecord` and its `Error` is `ApiError`. A field marked `NotRequired` may be absent; one typed `X | None` may be
+present and None. Read the first with `.get()`.
 
 ### Reading an answer
 
@@ -239,6 +294,8 @@ A **person** and a **candidate** are different things: see [the words used here]
 - **None is ordinary.** Many records have no person ID yet.
 - **Match a writers check by number, not position.** Repeats and two forms of one number come back as one entry, as
   11 digits. `normalize_ipi()` turns your input into the same form.
+- **Match a songwriters answer by ISRC, not position**, for the same reason: `normalize_isrc()` writes your ISRC the
+  way the answer does (12 characters, upper case, no dashes).
 - **Person IDs can be prerelease.** A prerelease ID may stop resolving, or point at a different person, without notice.
   Check `prerelease` before you store one.
 
@@ -290,7 +347,8 @@ A client holds no connection and no state between calls, so one can be shared ac
 
 The API is free and open. It allows about 100 requests per 5 minutes from one address, across every endpoint, and 20
 from VPNs, proxies and hosting providers, which includes most cloud servers. Please send a `user_agent` that names your
-app, keep to one request at a time per user action, and cache answers you reuse. Over the limit, the SDK raises a
+app, keep to one request at a time per user action, and cache answers you reuse. A `writers()` or `songwriters()`
+call counts as one request however many entries it holds, so batch them. Over the limit, the SDK raises a
 `RateLimitedError` whose `retry_after_seconds` is the most you need to wait; for a whole roster, see
 [bulk songwriter lookup](https://songlinks.io/bulk-songwriter-lookup).
 

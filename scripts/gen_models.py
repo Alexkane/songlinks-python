@@ -56,6 +56,10 @@ NAMES = {
     "WritersResponse": "WritersResponse",
     "WriterAnswer": "WriterAnswer",
     "WritersSummary": "WritersSummary",
+    "SongwritersResponse": "SongwritersResponse",
+    "RecordingAnswer": "RecordingAnswer",
+    "RecordingWork": "RecordingWork",
+    "RecordingWriter": "RecordingWriter",
     "VersionResponse": "VersionResponse",
     "Error": "ApiError",
     "RateLimited": "RateLimited",
@@ -68,6 +72,9 @@ OVERRIDES = {
     "on the last page. `Songlinks.person_works(id)` reads every page for you.",
     ("PersonResponse", "works_list"): "One page of works. For the next page, pass `works_list['next_offset']` to "
     "`Songlinks.person(id, works_offset=...)`, or read them all with `Songlinks.person_works(id)`.",
+    # The API's text says "relative to this site", which reads as nothing in an editor, away from the site.
+    ("RecordingWriter", "person_url"): "The person's page, as a path on songlinks.io such as "
+    "`/person/SLP-ZYM7-GD3E-S`: put `https://songlinks.io` in front of it to open it. None when `persistent_id` is.",
 }
 
 
